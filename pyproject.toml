@@ -1,0 +1,15 @@
+
+[project]
+name = "ebert"
+version = "0.0.1"
+dependencies = [
+    "aiohttp>=3.9.dev0",
+    "aiosqlite",
+    "dacite",
+    "discord.py[speed]",
+    "sqlalchemy[asyncio]",
+    "typer[all]",
+]
+
+[project.scripts]
+ebert = "ebert.cli:app"
