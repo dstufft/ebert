@@ -55,6 +55,7 @@ class Movie(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(unique=True)
+    tmdb_id: Mapped[int] = mapped_column(unique=True)
 
 
 class PollMovie(Base):

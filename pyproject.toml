@@ -9,6 +9,7 @@ dependencies = [
     "discord.py[speed]",
     "sqlalchemy[asyncio]",
     "typer[all]",
+    "tmdb-python",
 ]
 
 [project.scripts]

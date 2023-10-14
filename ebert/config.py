@@ -14,7 +14,13 @@ class Database:
 
 
 @dataclass
+class TMDB:
+    api_key: str
+
+
+@dataclass
 class Config:
     discord: Discord
     db: Database
+    tmdb: TMDB
     root: str = "."

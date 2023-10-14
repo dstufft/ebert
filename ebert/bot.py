@@ -1,9 +1,11 @@
+import datetime
 import os.path
 import random
 import re
 
 import discord
 import discord.ui
+import tmdb.route
 
 from discord import app_commands
 from sqlalchemy import select
@@ -53,6 +55,9 @@ class Ebert(discord.Client):
 
         self.engine = create_async_engine(f"sqlite+aiosqlite:////{db_path}")
         self.db = async_sessionmaker(self.engine)
+
+        self.tmdb = tmdb.route.Base()
+        self.tmdb.key = self.config.tmdb.api_key
 
     async def on_message(self, message: discord.Message):
         if message.channel.id == self.config.discord.channel:
@@ -139,9 +144,18 @@ async def poll_end(ctx: discord.Interaction, winner: str) -> None:
 
 
 @app_commands.command(name="movie", description="Suggest a movie")
-@app_commands.describe(movie="The name of a movie to suggest")
-async def suggest_movie(ctx: discord.Interaction, movie: str):
+@app_commands.describe(
+    movie="The name of a movie to suggest",
+    year="(Optional) The year the movie was released (as reported by TMDB)",
+)
+async def suggest_movie(ctx: discord.Interaction, movie: str, year: str | None = None):
     await ctx.response.defer(ephemeral=True)
+
+    try:
+        year_i = int(year) if year else 0
+    except ValueError:
+        await ctx.followup.send(f"{year} is not a valid year.")
+        return
 
     async with client_db(ctx) as db:
         result = await db.execute(select(Poll).filter(Poll.open == True).limit(1))
@@ -151,7 +165,41 @@ async def suggest_movie(ctx: discord.Interaction, movie: str):
             await ctx.followup.send("No open movie night polls")
             return
 
-        if movie in [m.title for m in poll.movies.values()]:
+        all_movies = (await tmdb.route.Movie().search(movie)).get("results", [])
+        movies: list[tuple[str, int]] = []
+        for result in all_movies:
+            if (
+                result.get("title").lower() != movie.lower()
+                and result.get("original_title", "").lower() != movie.lower()
+            ):
+                continue
+
+            if year_i:
+                if "release_date" not in result:
+                    continue
+
+                release_date = datetime.date.fromisoformat(result["release_date"])
+                if release_date.year != year_i:
+                    continue
+
+            movies.append(
+                (result.get("title", result.get("original_title", movie)), result["id"])
+            )
+
+        if not movies:
+            await ctx.followup.send(
+                f"Could not find any movies in https://www.themoviedb.org for {movie}"
+            )
+            return
+        if len(movies) > 1:
+            await ctx.followup.send(
+                f"Multiple movies found for {movie}, try adding a release year."
+            )
+            return
+
+        selected_movie = movies[0]
+
+        if selected_movie[1] in [m.tmdb_id for m in poll.movies.values()]:
             await ctx.followup.send(f"{movie} is already an option, try voting for it.")
             return
 
@@ -174,17 +222,21 @@ async def suggest_movie(ctx: discord.Interaction, movie: str):
 
         react_text: str = random.choice(available_reacts)
 
-        result = await db.execute(select(Movie).filter(Movie.title == movie).limit(1))
+        result = await db.execute(
+            select(Movie).filter(Movie.tmdb_id == selected_movie[1]).limit(1)
+        )
         movie_obj = result.unique().scalar_one_or_none()
         if movie_obj is None:
-            movie_obj = Movie(title=movie)
+            movie_obj = Movie(title=selected_movie[0], tmdb_id=selected_movie[1])
             db.add(movie_obj)
 
         poll.movies[react_text] = movie_obj
 
         await message.edit(content=poll_message(channel.guild, poll))
         await message.add_reaction(emoji(channel.guild, react_text))
-        await channel.send(f"Added {movie_obj.title}, suggested by {ctx.user.mention}")
+        await channel.send(
+            f"Added {movie_obj.title} (<https://www.themoviedb.org/movie/{movie_obj.tmdb_id}>), suggested by {ctx.user.mention}"
+        )
         await db.commit()
 
     await ctx.followup.send("Poll Updated")
@@ -194,11 +246,15 @@ def client_db(ctx: discord.Interaction) -> AsyncSession:
     return ctx.client.db()
 
 
+def tmdb_api(ctx: discord.Interaction) -> tmdb.route.Base:
+    return ctx.client.tmdb
+
+
 def poll_message(guild: discord.Guild, poll: Poll) -> str:
     if poll.open:
         msg = ["Vote on the next Movie Night Movie!"]
         msg += [
-            f"- {emoji(guild, react)} {movie.title}"
+            f"- {emoji(guild, react)} {movie.title} (<https://www.themoviedb.org/movie/{movie.tmdb_id}>)"
             for react, movie in poll.movies.items()
         ]
         msg += ["", "To vote, click a react, or add another movie through ``/movie``"]
