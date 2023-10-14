@@ -136,11 +136,8 @@ async def poll_end(ctx: discord.Interaction, winner: str) -> None:
         poll.open = False
         poll.winner = movie
 
-        await message.delete()
-        message = await channel.send(poll_message(channel.guild, poll))
-        poll.channel_id = message.channel.id
-        poll.message_id = message.id
-
+        await message.edit(content=poll_message(channel.guild, poll))
+        await message.unpin()
         await db.commit()
 
     await ctx.followup.send("Poll Finished")
@@ -262,9 +259,7 @@ def poll_message(guild: discord.Guild, poll: Poll) -> str:
         ]
         msg += ["", "To vote, click a react, or add another movie through ``/movie``"]
     else:
-        msg = [
-            f"Next Movie Night Movie: {poll.winner.title} (<https://www.themoviedb.org/movie/{poll.winner.tmdb_id}>)!"
-        ]
+        msg = [f"Next Movie Night Movie: {poll.winner.title}"]
 
     return "\n".join(msg)
 
