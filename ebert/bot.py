@@ -1,4 +1,5 @@
 import os.path
+import random
 import re
 
 import discord
@@ -129,23 +130,9 @@ async def poll_end(ctx: discord.Interaction, winner: str) -> None:
 
 
 @app_commands.command(name="movie", description="Suggest a movie")
-@app_commands.describe(
-    movie="The name of a movie to suggest",
-    react="The name of a react to use",
-)
-async def suggest_movie(ctx: discord.Interaction, movie: str, react: str):
+@app_commands.describe(movie="The name of a movie to suggest")
+async def suggest_movie(ctx: discord.Interaction, movie: str):
     await ctx.response.defer(ephemeral=True)
-
-    if m := _emoji_regex.search(react):
-        react_text = m.group(1)
-        react_id = int(m.group(2))
-    else:
-        await ctx.followup.send("Reacts must be an emoji")
-        return
-
-    if react_id not in [e.id for e in ctx.guild.emojis]:
-        await ctx.followup.send(f"``{react}`` is not a valid emoji in this server")
-        return
 
     async with client_db(ctx) as db:
         result = await db.execute(select(Poll).filter(Poll.open == True).limit(1))
@@ -159,10 +146,6 @@ async def suggest_movie(ctx: discord.Interaction, movie: str, react: str):
             await ctx.followup.send(f"{movie} is already an option, try voting for it.")
             return
 
-        if react_text in poll.movies:
-            await ctx.followup.send(f"{react} is already an option, try another.")
-            return
-
         channel = ctx.client.get_channel(poll.channel_id)
         if channel is None:
             await ctx.followup.send("Could not locate channel")
@@ -170,8 +153,17 @@ async def suggest_movie(ctx: discord.Interaction, movie: str, react: str):
         try:
             message = await channel.fetch_message(poll.message_id)
         except discord.NotFound:
-            await ctx.response.send_message("Could not locate message", ephemeral=True)
+            await ctx.followup.send("Could not locate message")
             return
+
+        available_reacts = list(
+            set(e.name for e in channel.guild.emojis) - set(poll.movies.keys())
+        )
+        if not available_reacts:
+            await ctx.followup.send("No available emoji left, maybe next raid night?")
+            return
+
+        react_text: str = random.choice(available_reacts)
 
         result = await db.execute(select(Movie).filter(Movie.title == movie).limit(1))
         movie_obj = result.unique().scalar_one_or_none()
