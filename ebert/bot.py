@@ -184,6 +184,7 @@ async def suggest_movie(ctx: discord.Interaction, movie: str):
 
         await message.edit(content=poll_message(channel.guild, poll))
         await message.add_reaction(emoji(channel.guild, react_text))
+        await channel.send(f"Added {movie_obj.title}, suggested by {ctx.user.mention}")
         await db.commit()
 
     await ctx.followup.send("Poll Updated")
