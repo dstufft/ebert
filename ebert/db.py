@@ -54,7 +54,7 @@ class Movie(Base):
     __tablename__ = "movie"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str] = mapped_column(unique=True)
+    title: Mapped[str]
     tmdb_id: Mapped[int] = mapped_column(unique=True)
 
 
