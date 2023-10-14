@@ -29,6 +29,8 @@ class Ebert(discord.Client):
         self.config = config
         self._sync_commands = sync_commands
 
+        self.event(self.on_message)
+
         self.cmds = app_commands.CommandTree(self)
         self.cmds.add_command(ebert)
         self.cmds.add_command(suggest_movie)
@@ -51,6 +53,11 @@ class Ebert(discord.Client):
 
         self.engine = create_async_engine(f"sqlite+aiosqlite:////{db_path}")
         self.db = async_sessionmaker(self.engine)
+
+    async def on_message(self, message: discord.Message):
+        if message.channel.id == self.config.discord.channel:
+            if not message.author.bot:
+                await message.delete()
 
 
 ebert = app_commands.Group(name="ebert", description="Ebert Management")

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 class Discord:
     token: str
     guild: int | None = None
+    channel: int | None = None
 
 
 @dataclass
