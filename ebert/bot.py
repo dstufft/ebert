@@ -73,6 +73,7 @@ async def poll_start(ctx: discord.Interaction) -> None:
 
         poll = Poll(open=True)
         msg = await ctx.channel.send(poll_message(ctx.channel.guild, poll))
+        await msg.pin()
         poll.channel_id = msg.channel.id
         poll.message_id = msg.id
 
@@ -124,6 +125,7 @@ async def poll_end(ctx: discord.Interaction, winner: str) -> None:
         poll.winner = movie
 
         await message.edit(content=poll_message(channel.guild, poll))
+        await message.unpin()
         await db.commit()
 
     await ctx.followup.send("Poll Finished")
