@@ -255,7 +255,7 @@ def poll_message(guild: discord.Guild, poll: Poll) -> str:
         msg = ["Vote on the next Movie Night Movie!"]
         msg += [
             f"- {emoji(guild, react)} {movie.title} (<https://www.themoviedb.org/movie/{movie.tmdb_id}>)"
-            for react, movie in poll.movies.items()
+            for react, movie in sorted(poll.movies.items(), key=lambda i: i[1].title)
         ]
         msg += ["", "To vote, click a react, or add another movie through ``/movie``"]
     else:
