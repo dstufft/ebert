@@ -175,7 +175,7 @@ async def suggest_movie(ctx: discord.Interaction, movie: str, year: str | None =
                 continue
 
             if year_i:
-                if "release_date" not in result:
+                if not result.get("release_date"):
                     continue
 
                 release_date = datetime.date.fromisoformat(result["release_date"])
